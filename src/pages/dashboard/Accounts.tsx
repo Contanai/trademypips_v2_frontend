@@ -5,6 +5,7 @@ import AccountFilters from "@/components/dashboard/v2/accounts/AccountFilters";
 import AccountTable from "@/components/dashboard/v2/accounts/AccountTable";
 import AccountDrawer from "@/components/dashboard/v2/accounts/AccountDrawer";
 import AddAccountModal from "@/components/dashboard/v2/accounts/AddAccountModal";
+import PendingConnectionModal from "@/components/dashboard/v2/accounts/PendingConnectionModal";
 import { useUser } from "@/contexts/UserContext";
 import { useAccounts, useAccountAnalytics } from "@/hooks/v2/useDashboardData";
 import { useQueryClient } from "@tanstack/react-query";
@@ -23,6 +24,7 @@ const AccountsPageV2 = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [pendingModalAccountId, setPendingModalAccountId] = useState<string | null>(null);
   const previousAccountStateRef = useRef<Map<string, { status: string; role: string; name: string }>>(new Map());
   const hasHydratedRef = useRef(false);
 
@@ -45,6 +47,8 @@ const AccountsPageV2 = () => {
         status: acc.status || 'disconnected',
         role: acc.account_type === 'master' ? 'Master' : 'Copier',
         relationship: acc.account_type === 'master' ? "3 accounts copying" : "Copying MT5-001", // Placeholders as per design
+        vnc_host: acc.vnc_host ?? null,
+        vnc_port: acc.vnc_port ?? null,
       };
     }).filter((acc: any) => {
       const matchesSearch = acc.account_name.toLowerCase().includes(search.toLowerCase()) || 
@@ -59,8 +63,16 @@ const AccountsPageV2 = () => {
   }, [accountsRaw, analytics, search, filter]);
 
   const handleManage = (account: any) => {
+    if (account.status === "pending") {
+      setPendingModalAccountId(account.id);
+      return;
+    }
     setSelectedAccount(account);
     setIsDrawerOpen(true);
+  };
+
+  const handlePendingConnectionClick = (account: any) => {
+    setPendingModalAccountId(account.id);
   };
 
   const handleAddAccount = () => {
@@ -165,6 +177,25 @@ const AccountsPageV2 = () => {
     previousAccountStateRef.current = currentMap;
   }, [accountsRaw, userId]);
 
+  const pendingModalAccount = accounts.find((account: any) => account.id === pendingModalAccountId) ?? null;
+  const buildPendingConnectionUrl = (account: any): string | null => {
+    if (!account) return null;
+    if (account.status !== "pending") return null;
+    const host = String(account.vnc_host ?? "").trim();
+    const port = String(account.vnc_port ?? "").trim();
+    if (!host || !port) return null;
+    return `http://${host}:${port}/vnc_overlay.html?autoconnect=true&resize=scale`;
+  };
+  const pendingConnectionUrl = buildPendingConnectionUrl(pendingModalAccount);
+
+  useEffect(() => {
+    if (!pendingModalAccountId) return;
+    const account = accounts.find((entry: any) => entry.id === pendingModalAccountId);
+    if (!account || account.status === "connected" || account.status !== "pending") {
+      setPendingModalAccountId(null);
+    }
+  }, [accounts, pendingModalAccountId]);
+
   if (loadingAccounts || loadingAnalytics) {
     return (
       <DashboardLayoutV2>
@@ -203,6 +234,7 @@ const AccountsPageV2 = () => {
         <AccountTable 
           accounts={accounts}
           onManage={handleManage}
+          onPendingConnectionClick={handlePendingConnectionClick}
         />
 
         <AccountDrawer 
@@ -218,6 +250,13 @@ const AccountsPageV2 = () => {
           userId={userId}
           onClose={() => setIsAddModalOpen(false)}
           onCreated={handleAccountCreated}
+        />
+
+        <PendingConnectionModal
+          isOpen={!!pendingModalAccountId}
+          accountName={pendingModalAccount?.account_name ?? "MT5 Account"}
+          connectionUrl={pendingConnectionUrl}
+          onClose={() => setPendingModalAccountId(null)}
         />
       </div>
     </DashboardLayoutV2>

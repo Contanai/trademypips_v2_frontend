@@ -9,14 +9,18 @@ interface Account {
   daily_pnl: number;
   account_type: string;
   status: string;
+  vnc_host?: string | null;
+  vnc_port?: number | string | null;
 }
 
 const AccountsTableV2 = ({
   accounts = [],
   onRowClick,
+  onPendingConnectionClick,
 }: {
   accounts: Account[];
   onRowClick?: (account: Account) => void;
+  onPendingConnectionClick?: (account: Account) => void;
 }) => {
   return (
     <section className="bg-[#11161D] rounded-lg border border-[#859399]/15 overflow-hidden shadow-2xl">
@@ -53,6 +57,49 @@ const AccountsTableV2 = ({
                 }}
                 className={`hover:bg-[#1C1B1B] transition-colors group ${onRowClick ? "cursor-pointer" : ""}`}
               >
+                {account.status === "pending" ? (
+                  <td colSpan={6} className="relative p-0">
+                    <div className="grid min-h-[72px] grid-cols-6 divide-x divide-white/5">
+                      <div className="px-8 py-4">
+                        <p className="text-sm font-bold text-white tracking-tight">#{account.account_number}</p>
+                        <p className="text-[10px] text-slate-500 uppercase font-mono tracking-tighter">{account.account_name}</p>
+                      </div>
+                      <div className="px-8 py-4 font-mono text-sm self-center">${account.balance.toLocaleString()}</div>
+                      <div className="px-8 py-4 font-mono text-sm text-[#00D1FF] font-bold self-center">${account.equity.toLocaleString()}</div>
+                      <div className={`px-8 py-4 font-mono text-sm self-center ${account.daily_pnl >= 0 ? "text-[#27ff97]" : "text-error"}`}>
+                        {account.daily_pnl >= 0 ? "+" : ""}${account.daily_pnl.toLocaleString()}
+                      </div>
+                      <div className="px-8 py-4 self-center">
+                        <span className={`text-[10px] font-bold px-2 py-1 border transition-all ${
+                          account.account_type === "MASTER"
+                            ? "bg-[#1C1B1B] border-[#00D1FF]/30 text-[#00D1FF]"
+                            : "bg-[#1C1B1B] border-slate-700 text-slate-400"
+                        }`}>
+                          {account.account_type}
+                        </span>
+                      </div>
+                      <div className="px-8 py-4 self-center">
+                        <div className="flex items-center gap-2">
+                          <Circle size={8} fill="#ffb020" className="text-[#ffb020]" />
+                          <span className="text-[10px] font-bold uppercase text-[#ffb020]">{account.status}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[#0a0f14]/35 backdrop-blur-[1px] transition-colors group-hover:bg-[#0a0f14]/45">
+                      <button
+                        type="button"
+                        className="pointer-events-auto rounded-sm border border-[#00D1FF]/50 bg-[#00D1FF]/15 px-4 py-2 text-xs font-headline font-bold uppercase tracking-widest text-[#00D1FF] shadow-lg backdrop-blur-sm transition-all hover:border-[#00D1FF]/70 hover:bg-[#00D1FF]/25"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPendingConnectionClick?.(account);
+                        }}
+                      >
+                        Complete Account Connection
+                      </button>
+                    </div>
+                  </td>
+                ) : (
+                  <>
                 <td className="px-8 py-4">
                   <p className="text-sm font-bold text-white tracking-tight">#{account.account_number}</p>
                   <p className="text-[10px] text-slate-500 uppercase font-mono tracking-tighter">{account.account_name}</p>
@@ -79,6 +126,8 @@ const AccountsTableV2 = ({
                     </span>
                   </div>
                 </td>
+                  </>
+                )}
               </tr>
             )) : (
               <tr>

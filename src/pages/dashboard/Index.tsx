@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import DashboardLayoutV2 from "@/components/dashboard/v2/DashboardLayoutV2";
 import PortfolioStrip from "@/components/dashboard/v2/PortfolioStrip";
 import EquityChart from "@/components/dashboard/v2/EquityChart";
@@ -9,6 +9,7 @@ import RecentTradesV2 from "@/components/dashboard/v2/RecentTradesV2";
 import ActivityFeedV2 from "@/components/dashboard/v2/ActivityFeedV2";
 import AddAccountModal from "@/components/dashboard/v2/accounts/AddAccountModal";
 import AccountDrawer from "@/components/dashboard/v2/accounts/AccountDrawer";
+import PendingConnectionModal from "@/components/dashboard/v2/accounts/PendingConnectionModal";
 import { useUser } from "@/contexts/UserContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,6 +34,7 @@ const DashboardIndexV2 = () => {
   } | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [pendingModalAccountId, setPendingModalAccountId] = useState<string | null>(null);
 
   const { data: accounts = [], isLoading: loadingAccounts, error: accountsError } = useAccounts(userId);
   const { data: analytics = [], isLoading: loadingAnalytics, error: analyticsError } = useAccountAnalytics(userId);
@@ -87,8 +89,29 @@ const DashboardIndexV2 = () => {
       daily_pnl: dailyPnl,
       status: a.status || "disconnected",
       account_type: a.account_type?.toUpperCase() || "SLAVE",
+      vnc_host: a.vnc_host ?? null,
+      vnc_port: a.vnc_port ?? null,
     };
   });
+
+  const pendingModalAccount = tableAccounts.find((account) => account.id === pendingModalAccountId) ?? null;
+  const buildPendingConnectionUrl = (account: (typeof tableAccounts)[number] | null): string | null => {
+    if (!account) return null;
+    if (account.status !== "pending") return null;
+    const host = String(account.vnc_host ?? "").trim();
+    const port = String(account.vnc_port ?? "").trim();
+    if (!host || !port) return null;
+    return `http://${host}:${port}/vnc_overlay.html?autoconnect=true&resize=scale`;
+  };
+  const pendingConnectionUrl = buildPendingConnectionUrl(pendingModalAccount);
+
+  useEffect(() => {
+    if (!pendingModalAccountId) return;
+    const account = tableAccounts.find((row) => row.id === pendingModalAccountId);
+    if (!account || account.status === "connected" || account.status !== "pending") {
+      setPendingModalAccountId(null);
+    }
+  }, [tableAccounts, pendingModalAccountId]);
 
   if (loadingAccounts || loadingAnalytics) {
     return (
@@ -118,6 +141,10 @@ const DashboardIndexV2 = () => {
   };
 
   const handleInfrastructureRowClick = (row: (typeof tableAccounts)[number]) => {
+    if (row.status === "pending") {
+      setPendingModalAccountId(row.id);
+      return;
+    }
     setSelectedAccount({
       id: row.id,
       account_name: row.account_name,
@@ -127,6 +154,10 @@ const DashboardIndexV2 = () => {
       pnl: row.daily_pnl,
     });
     setIsDrawerOpen(true);
+  };
+
+  const handlePendingConnectionClick = (row: (typeof tableAccounts)[number]) => {
+    setPendingModalAccountId(row.id);
   };
 
   const handleDisconnectAccount = async (accountId: string) => {
@@ -172,7 +203,11 @@ const DashboardIndexV2 = () => {
 
         <SignalPipeline />
 
-        <AccountsTableV2 accounts={tableAccounts} onRowClick={handleInfrastructureRowClick} />
+        <AccountsTableV2
+          accounts={tableAccounts}
+          onRowClick={handleInfrastructureRowClick}
+          onPendingConnectionClick={handlePendingConnectionClick}
+        />
 
         <AccountDrawer
           account={selectedAccount}
@@ -195,6 +230,13 @@ const DashboardIndexV2 = () => {
           userId={userId}
           onClose={() => setIsAddModalOpen(false)}
           onCreated={handleAccountCreated}
+        />
+
+        <PendingConnectionModal
+          isOpen={!!pendingModalAccountId}
+          accountName={pendingModalAccount?.account_name ?? "MT5 Account"}
+          connectionUrl={pendingConnectionUrl}
+          onClose={() => setPendingModalAccountId(null)}
         />
       </div>
     </DashboardLayoutV2>
