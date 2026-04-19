@@ -184,7 +184,7 @@ const AccountsPageV2 = () => {
     const host = String(account.vnc_host ?? "").trim();
     const port = String(account.vnc_port ?? "").trim();
     if (!host || !port) return null;
-    return `http://${host}:${port}/vnc_overlay.html?autoconnect=true&resize=scale`;
+    return `http://${host}:${port}/vnc_overlay.html?autoconnect=true&resize=scale&account_id=${encodeURIComponent(account.id)}`;
   };
   const pendingConnectionUrl = buildPendingConnectionUrl(pendingModalAccount);
 
