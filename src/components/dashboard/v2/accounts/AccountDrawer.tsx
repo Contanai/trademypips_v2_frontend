@@ -32,19 +32,33 @@ interface OpenTrade {
 const AccountDrawer = ({ account, isOpen, onClose, onDisconnect, disconnecting = false }: AccountDrawerProps) => {
   if (!account) return null;
 
-  const { data: openTrades = [], isLoading: loadingOpenTrades } = useQuery({
+  const { data: openTrades = [], isLoading: loadingOpenTrades, isError: openTradesError } = useQuery({
     queryKey: ["account-open-trades", account.id],
     queryFn: async (): Promise<OpenTrade[]> => {
       const { data, error } = await supabase
         .from("positions")
-        .select("id,symbol,type,volume,open_price,profit")
+        .select(`
+          id,
+          symbol,
+          side,
+          volume,
+          open_price,
+          profit
+        `)
         .eq("account_id", account.id)
         .eq("status", "open")
         .order("created_at", { ascending: false })
         .limit(10);
 
       if (error) throw error;
-      return (data || []) as OpenTrade[];
+      return (data || []).map((trade: any) => ({
+        id: trade.id,
+        symbol: trade.symbol || "N/A",
+        type: (String(trade.side || "buy").toUpperCase() === "SELL" ? "SELL" : "BUY") as "BUY" | "SELL",
+        volume: Number(trade.volume || 0),
+        open_price: Number(trade.open_price || 0),
+        profit: Number(trade.profit || 0),
+      }));
     },
     enabled: isOpen && !!account.id,
     staleTime: 1000 * 30,
@@ -133,6 +147,10 @@ const AccountDrawer = ({ account, isOpen, onClose, onDisconnect, disconnecting =
               {loadingOpenTrades ? (
                 <p className="text-center text-slate-500 text-[10px] uppercase font-mono py-5 tracking-widest border border-dashed border-white/10 rounded">
                   Loading open trades...
+                </p>
+              ) : openTradesError ? (
+                <p className="text-center text-error text-[10px] uppercase font-mono py-5 tracking-widest border border-dashed border-error/30 rounded">
+                  Failed to load open trades
                 </p>
               ) : openTrades.length > 0 ? (
                 openTrades.map((trade) => (

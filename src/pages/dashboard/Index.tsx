@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { 
   useAccounts, 
   useAccountAnalytics, 
+  useRecentPositions,
   useRecentTrades, 
   useSystemLogs 
 } from "@/hooks/v2/useDashboardData";
@@ -38,6 +39,7 @@ const DashboardIndexV2 = () => {
 
   const { data: accounts = [], isLoading: loadingAccounts, error: accountsError } = useAccounts(userId);
   const { data: analytics = [], isLoading: loadingAnalytics, error: analyticsError } = useAccountAnalytics(userId);
+  const { data: positions = [] } = useRecentPositions(userId);
   const { data: trades = [] } = useRecentTrades(userId);
   const { data: logs = [] } = useSystemLogs(userId);
 
@@ -66,6 +68,16 @@ const DashboardIndexV2 = () => {
     open_price: Number(t.open_price || 0),
     profit: Number(t.profit || 0),
     time_ago: safeTime(t.close_time, "N/A"),
+  }));
+
+  const formattedOpenTrades = positions.map((p: any) => ({
+    id: p.id,
+    symbol: p.symbol || "N/A",
+    type: ((p.type || p.side || "BUY").toUpperCase() === "SELL" ? "SELL" : "BUY") as "BUY" | "SELL",
+    volume: Number(p.volume || 0),
+    open_price: Number(p.open_price || p.entry_price || 0),
+    profit: Number(p.profit || p.unrealized_pnl || 0),
+    time_ago: safeTime(p.created_at || p.open_time, "N/A"),
   }));
 
   // Format logs for the V2 component
@@ -221,7 +233,7 @@ const DashboardIndexV2 = () => {
         />
 
         <div className="grid grid-cols-1 gap-8 pb-12 lg:grid-cols-2">
-          <RecentTradesV2 trades={formattedTrades} />
+          <RecentTradesV2 openTrades={formattedOpenTrades} trades={formattedTrades} />
           <ActivityFeedV2 logs={formattedLogs} />
         </div>
 
