@@ -14,6 +14,8 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { writeSystemLog } from "@/lib/systemLogs";
 
+type GroupStatus = "active" | "paused" | "error";
+
 const CopyGroupsPageV2 = () => {
   const queryClient = useQueryClient();
   const { userId } = useUser();
@@ -53,10 +55,11 @@ const CopyGroupsPageV2 = () => {
       const isActive = group.configs.some((c: any) => c.active);
       const isError = group.copiers.some((c: any) => c.status !== 'connected');
       
+      const status: GroupStatus = !isActive ? "paused" : (isError ? "error" : "active");
       return {
         id: group.id,
         name: `${group.masterAccount?.account_name || "Account"} → ${group.copiers.length} Accounts`,
-        status: !isActive ? 'paused' : (isError ? 'error' : 'active'),
+        status,
         latency: 180, // Mocked latency
         masterAccount: group.masterAccount?.account_name || group.masterAccount?.account_number || "Unknown",
         copiers: group.copiers.map((c: any) => c.status !== 'connected' ? `${c.account_name} (ERR)` : (c.account_name || c.account_number)),

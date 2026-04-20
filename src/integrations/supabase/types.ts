@@ -6,6 +6,21 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+type GenericRelationship = {
+  foreignKeyName: string
+  columns: string[]
+  isOneToOne: boolean
+  referencedRelation: string
+  referencedColumns: string[]
+}
+
+type GenericTable = {
+  Row: Record<string, unknown>
+  Insert: Record<string, unknown>
+  Update: Record<string, unknown>
+  Relationships: GenericRelationship[]
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -36,7 +51,8 @@ export type Database = {
         }
         Relationships: []
       }
-      // Simplified for now, can be expanded later
+      // Fallback for tables not yet captured by generated types.
+      [key: string]: GenericTable
     }
     Views: {
       [_ in never]: never

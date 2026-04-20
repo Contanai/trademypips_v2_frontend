@@ -90,7 +90,7 @@ const DashboardIndexV2 = () => {
   }));
 
   const tableAccounts = accounts.map((a: any) => {
-    const accountAnalytics = analytics.find((entry: any) => entry.account_id === a.id) || {};
+    const accountAnalytics: any = analytics.find((entry: any) => entry.account_id === a.id) || {};
     const dailyPnl = Number(accountAnalytics.daily_pnl ?? a.daily_pnl ?? 0);
     return {
       ...a,

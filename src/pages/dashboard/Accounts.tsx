@@ -35,7 +35,7 @@ const AccountsPageV2 = () => {
 
   const accounts = useMemo(() => {
     return accountsRaw.map((acc: any) => {
-      const accountAnalytics = analytics.find((a: any) => a.account_id === acc.id) || {};
+      const accountAnalytics: any = analytics.find((a: any) => a.account_id === acc.id) || {};
       return {
         id: acc.id,
         account_name: acc.account_name || `Account ${(acc.account_number || "").slice(-4)}`,
