@@ -29,6 +29,14 @@ const SettingsPageV2 = () => {
   const [copyRules, setCopyRules] = useState<CopyRulesState>(initialCopyRules);
   const [tradePrefsError, setTradePrefsError] = useState("");
   const [savingTradePrefs, setSavingTradePrefs] = useState(false);
+  const [profileFullName, setProfileFullName] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
+  const [profileBio, setProfileBio] = useState("");
+  const [profileVisibilityEnabled, setProfileVisibilityEnabled] = useState(true);
+  const [profileError, setProfileError] = useState("");
+  const [profileSuccess, setProfileSuccess] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
   const tradePrefsHydrated = useRef(false);
 
   const {
@@ -46,6 +54,84 @@ const SettingsPageV2 = () => {
   useEffect(() => {
     if (!user?.id) tradePrefsHydrated.current = false;
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let mounted = true;
+
+    const loadProfile = async () => {
+      setLoadingProfile(true);
+      setProfileError("");
+      const metadata = (user.user_metadata ?? {}) as Record<string, unknown>;
+      const metadataName = String(metadata.full_name ?? "").trim();
+      const metadataBio = String(metadata.bio ?? "").trim();
+      const metadataVisibility = metadata.copy_trade_visibility;
+
+      const { data, error } = await (supabase as any)
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!mounted) return;
+      setLoadingProfile(false);
+
+      if (error) {
+        setProfileError(error.message);
+      }
+
+      const dbName = String(data?.full_name ?? "").trim();
+      setProfileFullName(dbName || metadataName);
+      setProfileEmail(user.email ?? "");
+      setProfileBio(metadataBio);
+      setProfileVisibilityEnabled(typeof metadataVisibility === "boolean" ? metadataVisibility : true);
+    };
+
+    void loadProfile();
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id, user?.email, user?.user_metadata]);
+
+  const handleSaveProfile = async () => {
+    if (!user?.id) return;
+    setProfileError("");
+    setProfileSuccess("");
+    setSavingProfile(true);
+
+    const { error: profileErrorResult } = await (supabase as any).from("profiles").upsert(
+      {
+        id: user.id,
+        full_name: profileFullName.trim() || null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    );
+
+    if (profileErrorResult) {
+      setSavingProfile(false);
+      setProfileError(profileErrorResult.message);
+      return;
+    }
+
+    const { error: authError } = await supabase.auth.updateUser({
+      email: profileEmail.trim() || undefined,
+      data: {
+        full_name: profileFullName.trim() || null,
+        bio: profileBio.trim(),
+        copy_trade_visibility: profileVisibilityEnabled,
+      },
+    });
+
+    setSavingProfile(false);
+
+    if (authError) {
+      setProfileError(authError.message);
+      return;
+    }
+
+    setProfileSuccess("Profile updated successfully.");
+  };
 
   const handleSaveTradePreferences = async () => {
     if (!user?.id) return;
@@ -158,24 +244,41 @@ const SettingsPageV2 = () => {
                   <button className="absolute bottom-0 right-0 bg-[#00d1ff] text-[#003543] p-2 rounded-full material-symbols-outlined text-sm hover:scale-110 transition-transform shadow-lg">edit</button>
                 </div>
                 <div className="text-center space-y-1">
-                  <h3 className="text-xl font-headline font-bold text-white">Promise Nzereogu</h3>
+                  <h3 className="text-xl font-headline font-bold text-white">{profileFullName || "Unnamed User"}</h3>
                   <p className="text-[#a4e6ff] text-sm font-mono">@trademaster</p>
                 </div>
               </div>
               <div className="md:col-span-2 bg-[#1c1b1b] p-8 rounded-xl space-y-6">
+                {loadingProfile ? <p className="text-xs text-gray-500">Loading profile…</p> : null}
+                {profileError ? <p className="text-xs text-[#ffb4ab]">{profileError}</p> : null}
+                {profileSuccess ? <p className="text-xs text-[#27ff97]">{profileSuccess}</p> : null}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-xs uppercase tracking-widest text-white/40 font-bold">Full Name</label>
-                    <input className="w-full bg-[#0e0e0e] border border-white/5 focus:ring-1 focus:ring-[#00d1ff] rounded-sm text-sm p-3 text-white outline-none" type="text" defaultValue="Promise Nzereogu" />
+                    <input
+                      className="w-full bg-[#0e0e0e] border border-white/5 focus:ring-1 focus:ring-[#00d1ff] rounded-sm text-sm p-3 text-white outline-none"
+                      type="text"
+                      value={profileFullName}
+                      onChange={(e) => setProfileFullName(e.target.value)}
+                    />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs uppercase tracking-widest text-white/40 font-bold">Email Address</label>
-                    <input className="w-full bg-[#0e0e0e] border border-white/5 focus:ring-1 focus:ring-[#00d1ff] rounded-sm text-sm p-3 text-white outline-none" type="email" defaultValue="example@email.com" />
+                    <input
+                      className="w-full bg-[#0e0e0e] border border-white/5 focus:ring-1 focus:ring-[#00d1ff] rounded-sm text-sm p-3 text-white outline-none"
+                      type="email"
+                      value={profileEmail}
+                      onChange={(e) => setProfileEmail(e.target.value)}
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs uppercase tracking-widest text-white/40 font-bold">Bio</label>
-                  <textarea className="w-full bg-[#0e0e0e] border border-white/5 focus:ring-1 focus:ring-[#00d1ff] rounded-sm text-sm p-3 text-white h-24 resize-none outline-none">Institutional trader specializing in HFT and kinetic infrastructure analysis.</textarea>
+                  <textarea
+                    className="w-full bg-[#0e0e0e] border border-white/5 focus:ring-1 focus:ring-[#00d1ff] rounded-sm text-sm p-3 text-white h-24 resize-none outline-none"
+                    value={profileBio}
+                    onChange={(e) => setProfileBio(e.target.value)}
+                  />
                 </div>
                 <div className="flex items-center justify-between p-4 bg-[#0e0e0e] rounded-sm border border-white/5">
                   <div>
@@ -183,9 +286,24 @@ const SettingsPageV2 = () => {
                     <p className="text-xs text-white/40">Allow others to copy my trades in the marketplace</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input defaultChecked className="sr-only peer" type="checkbox" />
+                    <input
+                      checked={profileVisibilityEnabled}
+                      onChange={(e) => setProfileVisibilityEnabled(e.target.checked)}
+                      className="sr-only peer"
+                      type="checkbox"
+                    />
                     <div className="w-11 h-6 bg-[#353534] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00d1ff]"></div>
                   </label>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    disabled={savingProfile || loadingProfile}
+                    onClick={() => void handleSaveProfile()}
+                    className="rounded-sm bg-[#00d1ff] px-6 py-2 text-xs font-headline font-bold uppercase tracking-widest text-[#003543] transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {savingProfile ? "Saving..." : "Save Profile"}
+                  </button>
                 </div>
               </div>
             </div>

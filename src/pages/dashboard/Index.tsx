@@ -172,6 +172,18 @@ const DashboardIndexV2 = () => {
     setPendingModalAccountId(row.id);
   };
 
+  const handlePendingOverviewClick = (row: (typeof tableAccounts)[number]) => {
+    setSelectedAccount({
+      id: row.id,
+      account_name: row.account_name,
+      account_number: row.account_number,
+      balance: row.balance,
+      equity: row.equity,
+      pnl: row.daily_pnl,
+    });
+    setIsDrawerOpen(true);
+  };
+
   const handleDisconnectAccount = async (accountId: string) => {
     if (!userId) return;
     const confirmed = window.confirm("Remove this account from your dashboard?");
@@ -219,6 +231,7 @@ const DashboardIndexV2 = () => {
           accounts={tableAccounts}
           onRowClick={handleInfrastructureRowClick}
           onPendingConnectionClick={handlePendingConnectionClick}
+          onPendingOverviewClick={handlePendingOverviewClick}
         />
 
         <AccountDrawer

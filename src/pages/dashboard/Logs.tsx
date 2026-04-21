@@ -1,5 +1,5 @@
 import DashboardLayoutV2 from "@/components/dashboard/v2/DashboardLayoutV2";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/contexts/UserContext";
 import { useAccounts, useSystemLogs } from "@/hooks/v2/useDashboardData";
 
@@ -29,11 +29,13 @@ const toClock = (iso?: string) => {
 };
 
 const LogsPageV2 = () => {
+  const ITEMS_PER_PAGE = 12;
   const { userId } = useUser();
   const { data: accounts = [] } = useAccounts(userId);
   const { data: logs = [], isLoading } = useSystemLogs(userId);
   const [activeTab, setActiveTab] = useState<LogTab>("All");
   const [selectedAccountId, setSelectedAccountId] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const accountMap = useMemo(() => {
     const map = new Map<string, { name: string; number: string; role: string }>();
@@ -86,7 +88,32 @@ const LogsPageV2 = () => {
     });
   }, [activeTab, normalizedLogs, selectedAccountId, accountMap]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / ITEMS_PER_PAGE));
+
+  const paginatedLogs = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredLogs.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredLogs, currentPage]);
+
+  const handleTabChange = (tab: LogTab) => {
+    setActiveTab(tab);
+    setCurrentPage(1);
+  };
+
+  const handleAccountChange = (accountId: string) => {
+    setSelectedAccountId(accountId);
+    setCurrentPage(1);
+  };
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const errorCount = normalizedLogs.filter((l) => l.level === "error" || l.category === "errors").length;
+  const warningCount = normalizedLogs.filter((l) => l.level === "warning" || l.category === "warnings").length;
+  const issueCount = errorCount + warningCount;
 
   const levelUi = (level: string) => {
     if (level === "error") {
@@ -112,18 +139,20 @@ const LogsPageV2 = () => {
 
   return (
     <DashboardLayoutV2>
-      {/* STICKY ALERT BAR - Adjust for HeaderV2 height (h-16) */}
-      <div className="sticky top-[-24px] lg:top-[-32px] z-30 bg-[#93000a] text-[#ffdad6] px-8 py-3 flex items-center justify-between shadow-[0_0_20px_0px_rgba(239,68,68,0.2)] mx-[-16px] sm:mx-[-24px] lg:mx-[-32px] mb-8">
-        <div className="flex items-center gap-3">
-          <span className="material-symbols-outlined font-variation-settings-fill-1 text-xl animate-pulse">report</span>
-          <span className="font-headline font-semibold text-sm tracking-tight text-white">
-            {errorCount > 0 ? `${errorCount} issue(s) detected` : "No critical issues detected"}
-          </span>
+      {/* STICKY ALERT BAR - only visible when warning/error logs exist */}
+      {issueCount > 0 && (
+        <div className="sticky top-[-24px] lg:top-[-32px] z-30 bg-[#93000a] text-[#ffdad6] px-8 py-3 flex items-center justify-between shadow-[0_0_20px_0px_rgba(239,68,68,0.2)] mx-[-16px] sm:mx-[-24px] lg:mx-[-32px] mb-8">
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined font-variation-settings-fill-1 text-xl animate-pulse">report</span>
+            <span className="font-headline font-semibold text-sm tracking-tight text-white">
+              {issueCount} issue(s) detected
+            </span>
+          </div>
+          <button className="bg-[#ffdad6] text-[#93000a] px-4 py-1 text-xs font-bold uppercase tracking-widest hover:brightness-90 transition-all rounded-sm">
+            Review
+          </button>
         </div>
-        <button className="bg-[#ffdad6] text-[#93000a] px-4 py-1 text-xs font-bold uppercase tracking-widest hover:brightness-90 transition-all rounded-sm">
-          Review
-        </button>
-      </div>
+      )}
 
       <div className="p-0">
         {/* HEADER SECTION */}
@@ -136,7 +165,7 @@ const LogsPageV2 = () => {
             <div className="relative">
               <select
                 value={selectedAccountId}
-                onChange={(e) => setSelectedAccountId(e.target.value)}
+                onChange={(e) => handleAccountChange(e.target.value)}
                 className="bg-[#1c1b1b] border-none text-sm font-headline font-medium py-3 px-6 pr-10 focus:ring-0 cursor-pointer text-[#a4e6ff] hover:bg-[#2a2a2a] transition-colors appearance-none rounded-sm"
               >
                 <option className="bg-[#131313]" value="all">All Accounts</option>
@@ -160,7 +189,7 @@ const LogsPageV2 = () => {
           {tabs.map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => handleTabChange(tab)}
               className={`px-6 py-2 text-xs font-headline font-bold uppercase tracking-widest rounded-full transition-all ${
                 activeTab === tab
                   ? "bg-[#00d1ff] text-[#003543]"
@@ -177,7 +206,7 @@ const LogsPageV2 = () => {
           {isLoading ? (
             <div className="py-12 text-center text-gray-500 text-xs uppercase tracking-widest">Loading logs...</div>
           ) : filteredLogs.length > 0 ? (
-            filteredLogs.map((log, idx) => {
+            paginatedLogs.map((log, idx) => {
               const ui = levelUi(log.level);
               return (
                 <div
@@ -207,6 +236,31 @@ const LogsPageV2 = () => {
             </div>
           )}
         </div>
+        {filteredLogs.length > ITEMS_PER_PAGE && (
+          <div className="mt-6 flex items-center justify-between border-t border-[#3c494e]/10 pt-4">
+            <p className="text-[10px] font-mono uppercase tracking-widest text-gray-500">
+              Page {currentPage} of {totalPages}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rounded border border-white/10 px-3 py-1.5 text-[10px] font-headline font-bold uppercase tracking-widest text-slate-300 transition-colors hover:border-[#00D1FF]/40 hover:text-[#00D1FF] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                Prev
+              </button>
+              <button
+                type="button"
+                className="rounded border border-white/10 px-3 py-1.5 text-[10px] font-headline font-bold uppercase tracking-widest text-slate-300 transition-colors hover:border-[#00D1FF]/40 hover:text-[#00D1FF] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* STREAM STATUS FOOTER */}
         <div className="mt-12 flex flex-col sm:flex-row items-center justify-between py-6 border-t border-[#3c494e]/10 gap-4">

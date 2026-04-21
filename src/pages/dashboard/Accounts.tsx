@@ -75,6 +75,11 @@ const AccountsPageV2 = () => {
     setPendingModalAccountId(account.id);
   };
 
+  const handlePendingOverviewClick = (account: any) => {
+    setSelectedAccount(account);
+    setIsDrawerOpen(true);
+  };
+
   const handleAddAccount = () => {
     setIsAddModalOpen(true);
   };
@@ -235,6 +240,7 @@ const AccountsPageV2 = () => {
           accounts={accounts}
           onManage={handleManage}
           onPendingConnectionClick={handlePendingConnectionClick}
+          onPendingOverviewClick={handlePendingOverviewClick}
         />
 
         <AccountDrawer 

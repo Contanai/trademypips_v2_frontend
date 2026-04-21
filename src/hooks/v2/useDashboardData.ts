@@ -92,6 +92,55 @@ export function useRecentTrades(userId: string | null) {
   });
 }
 
+export function useTradeHistory(userId: string | null) {
+  return useQuery({
+    queryKey: ["trade-history", userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      const { data } = await supabase
+        .from("trade_history")
+        .select(`
+          *,
+          trading_accounts!inner(id, user_id, account_name, account_number)
+        `)
+        .eq("trading_accounts.user_id", userId)
+        .order("close_time", { ascending: false })
+        .limit(500);
+      return data || [];
+    },
+    enabled: !!userId,
+    staleTime: 1000 * 60,
+  });
+}
+
+export function useOpenPositionsHistory(userId: string | null) {
+  return useQuery({
+    queryKey: ["open-positions-history", userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      const { data, error } = await supabase
+        .from("positions")
+        .select(`
+          *,
+          trading_accounts!inner(user_id, account_name, account_number)
+        `)
+        .eq("trading_accounts.user_id", userId)
+        .eq("status", "open")
+        .order("created_at", { ascending: false })
+        .limit(500);
+
+      if (error) {
+        console.error("open positions history fetch failed", error);
+        return [];
+      }
+
+      return data || [];
+    },
+    enabled: !!userId,
+    staleTime: 1000 * 30,
+  });
+}
+
 export function useSystemLogs(userId: string | null) {
   return useQuery({
     queryKey: ["system-logs", userId],

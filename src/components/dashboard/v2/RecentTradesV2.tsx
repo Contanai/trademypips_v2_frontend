@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ReceiptText } from "lucide-react";
 
 interface Trade {
@@ -43,7 +43,72 @@ const renderTradeRows = (items: Trade[], emptyLabel: string) => {
   ));
 };
 
+const PaginationControls = ({
+  currentPage,
+  totalPages,
+  onPrev,
+  onNext,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPrev: () => void;
+  onNext: () => void;
+}) => (
+  <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
+    <p className="text-[10px] font-mono uppercase tracking-widest text-slate-500">
+      Page {currentPage} of {totalPages}
+    </p>
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        className="rounded border border-white/10 px-3 py-1.5 text-[10px] font-headline font-bold uppercase tracking-widest text-slate-300 transition-colors hover:border-[#00D1FF]/40 hover:text-[#00D1FF] disabled:cursor-not-allowed disabled:opacity-40"
+        onClick={onPrev}
+        disabled={currentPage === 1}
+      >
+        Prev
+      </button>
+      <button
+        type="button"
+        className="rounded border border-white/10 px-3 py-1.5 text-[10px] font-headline font-bold uppercase tracking-widest text-slate-300 transition-colors hover:border-[#00D1FF]/40 hover:text-[#00D1FF] disabled:cursor-not-allowed disabled:opacity-40"
+        onClick={onNext}
+        disabled={currentPage === totalPages}
+      >
+        Next
+      </button>
+    </div>
+  </div>
+);
+
 const RecentTradesV2 = ({ openTrades = [], trades = [] }: { openTrades?: Trade[]; trades: Trade[] }) => {
+  const ITEMS_PER_PAGE = 8;
+  const [openTradesPage, setOpenTradesPage] = useState(1);
+  const [recentTradesPage, setRecentTradesPage] = useState(1);
+
+  const totalOpenPages = Math.max(1, Math.ceil(openTrades.length / ITEMS_PER_PAGE));
+  const totalRecentPages = Math.max(1, Math.ceil(trades.length / ITEMS_PER_PAGE));
+
+  const paginatedOpenTrades = useMemo(() => {
+    const start = (openTradesPage - 1) * ITEMS_PER_PAGE;
+    return openTrades.slice(start, start + ITEMS_PER_PAGE);
+  }, [openTrades, openTradesPage]);
+
+  const paginatedRecentTrades = useMemo(() => {
+    const start = (recentTradesPage - 1) * ITEMS_PER_PAGE;
+    return trades.slice(start, start + ITEMS_PER_PAGE);
+  }, [trades, recentTradesPage]);
+
+  useEffect(() => {
+    if (openTradesPage > totalOpenPages) {
+      setOpenTradesPage(totalOpenPages);
+    }
+  }, [openTradesPage, totalOpenPages]);
+
+  useEffect(() => {
+    if (recentTradesPage > totalRecentPages) {
+      setRecentTradesPage(totalRecentPages);
+    }
+  }, [recentTradesPage, totalRecentPages]);
+
   return (
     <section className="bg-surface-container-low rounded-lg p-6 border border-[#859399]/15 shadow-xl">
       <h3 className="font-headline font-bold text-lg uppercase mb-4 flex items-center justify-between text-white">
@@ -51,8 +116,16 @@ const RecentTradesV2 = ({ openTrades = [], trades = [] }: { openTrades?: Trade[]
         <ReceiptText size={20} className="text-slate-500" />
       </h3>
       <div className="space-y-4">
-        {renderTradeRows(openTrades, "No open trades")}
+        {renderTradeRows(paginatedOpenTrades, "No open trades")}
       </div>
+      {openTrades.length > ITEMS_PER_PAGE && (
+        <PaginationControls
+          currentPage={openTradesPage}
+          totalPages={totalOpenPages}
+          onPrev={() => setOpenTradesPage((prev) => Math.max(1, prev - 1))}
+          onNext={() => setOpenTradesPage((prev) => Math.min(totalOpenPages, prev + 1))}
+        />
+      )}
 
       <div className="my-6 border-t border-white/10" />
 
@@ -61,8 +134,16 @@ const RecentTradesV2 = ({ openTrades = [], trades = [] }: { openTrades?: Trade[]
         <ReceiptText size={20} className="text-slate-500" />
       </h3>
       <div className="space-y-4">
-        {renderTradeRows(trades, "Scanning transaction history...")}
+        {renderTradeRows(paginatedRecentTrades, "Scanning transaction history...")}
       </div>
+      {trades.length > ITEMS_PER_PAGE && (
+        <PaginationControls
+          currentPage={recentTradesPage}
+          totalPages={totalRecentPages}
+          onPrev={() => setRecentTradesPage((prev) => Math.max(1, prev - 1))}
+          onNext={() => setRecentTradesPage((prev) => Math.min(totalRecentPages, prev + 1))}
+        />
+      )}
     </section>
   );
 };
